@@ -1,0 +1,26 @@
+---
+  AWSTemplateFormatVersion: "2010-09-09"
+  Description: "Creates a VPC with Managed NAT, Public/Private subnets"
+  Parameters:
+    cidrBlock:
+      Type: String
+      Default: "10.0.0.0/16"
+  Resources:
+    VPC:
+      Type: "AWS::EC2::VPC"
+      Properties:
+        EnableDnsSupport: "true"
+        EnableDnsHostnames: "true"
+        CidrBlock: !Ref cidrBlock
+    PublicSubnet1:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        VpcId: !Ref VPC
+        AvailabilityZone: !Select
+          - 0
+          - Fn::GetAZs: ""
+        CidrBlock: !Select [0, !Cidr [!Ref cidrBlock, 16 , 8]]
+        Tags:
+          -
+            Key: "Name"
+            Value: "Public Subnet"
