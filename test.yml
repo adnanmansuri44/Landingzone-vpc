@@ -1,0 +1,71 @@
+---
+  AWSTemplateFormatVersion: "2010-09-09"
+  Description: "Creates a VPC with Managed NAT, Public/Private subnets"
+  Parameters:
+    vpccidrBlock:
+      Type: String
+      Default: "172.25.208.0/16"
+      Description: "Enter the VPC CIDR Range"
+    VPCName:
+      Type: String
+      Description: "Type the Name of VPC" 
+      Default: "MTR01-VPC-IR208"
+  Resources:
+    VPC:
+      Type: "AWS::EC2::VPC"
+      Properties:
+        EnableDnsSupport: 'false'
+        EnableDnsHostnames: 'false'        
+        CidrBlock: !Ref vpccidrBlock
+        Tags:
+        -   Key: foo
+            Value: !Ref VPCName
+    PublicSubnet1:
+      Type: "AWS::EC2::Subnet"
+      Properties:
+        VpcId: !Ref VPC
+        AvailabilityZone: !Select
+          - 0
+          - Fn::GetAZs: ""
+        CidrBlock: !Select [0, !Cidr [!Ref vpccidrBlock, 16 , 8]]
+        Tags:
+          -
+            Key: "Name"
+            Value: !Join [ "-", [ !Select [0, !Split ["-", !Ref VPCName]] , !Select [2, !Split ["-", !Ref VPCName]] ,SN-PUB01 ] ]
+    Role:
+      Type: 'AWS::IAM::Role'
+      Properties:
+        RoleName: FlowLogRole
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+              - 'vpc-flow-logs.amazonaws.com'
+            Action: 'sts:AssumeRole'
+        Policies:
+        - PolicyName: 'flowlogs-policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Effect: Allow
+              Action:
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+              - 'logs:DescribeLogGroups'
+              - 'logs:DescribeLogStreams'
+              Resource: "*"
+    LogGroup:
+      Type: 'AWS::Logs::LogGroup'
+      Properties:
+        LogGroupName : !Join [ "-", [ !Select [0, !Split ["-", !Ref VPCName]] ,VPCFlowlog, !Select [2, !Split ["-", !Ref VPCName]] ] ]
+        RetentionInDays: 90              
+    vpcflowlog:  
+      Type: AWS::EC2::FlowLog
+      Properties:
+        DeliverLogsPermissionArn: !GetAtt 'Role.Arn'
+        LogGroupName: !Ref LogGroup
+        ResourceId : !Ref VPC
+        ResourceType : VPC
+        TrafficType : ALL
